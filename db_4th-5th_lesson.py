@@ -154,7 +154,7 @@ def register():
                    (full_name, age, direction, is_have, birth_date, rating)
                    VALUES (?, ?, ?, ?, ?, ?) """, (full_name, age, direction, is_have, birth_date, rating))  
     
-    # place-holding in Backend (?)
+    # place-holding in Backend = (?)
 
     connect.commit() #Сохранение изменений в базе данных
 
@@ -180,6 +180,9 @@ def all_students(id):
 # all_students(1)   #выйдут данные пользователя с id 1
 # all_students(2)   #выйдут данные пользователя с id 2
 # all_students(3)   #ничего не выйдет - None(т.к. там никого нет)
+
+
+# если не записать запятую в (id,) то он будет читать как строку, а нам нужен tuple потому нужна запятая
 
 
 
