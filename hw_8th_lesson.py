@@ -1,3 +1,44 @@
+'''
+Система управления студентами и курсами
+📌 Цель:
+Создать консольное приложение для учета студентов, курсов и их записей на курсы с использованием ООП и SQLite3.
+
+🧱 Таблицы в базе данных (SQLite3):
+students(id, full_name, age)
+courses(id, title, teacher)
+enrollments(id, student_id, course_id, grade)
+💡 Требования по ООП:
+✅ 1. Инкапсуляция:
+Все важные данные (__id, __connection, __name) сделать приватными.
+Доступ к данным — только через get_, set_.
+✅ 2. Наследование:
+Базовый класс Person, от которого наследуется Student.
+Базовый класс DatabaseModel, от которого наследуются Student, Course, Enrollment.
+✅ 3. Полиморфизм:
+Метод info() должен работать по-разному в Student, Course, Enrollment.
+Метод save_to_db() должен быть переопределён в разных моделях.
+✅ 4. Абстракция:
+Все SQL-запросы должны быть "спрятаны" внутри методов.
+Пользователь работает с понятным интерфейсом: student.enroll(course) — а не cursor.execute(...)
+🧪 Функциональность:
+ Добавить студента
+ Добавить курс
+ Записать студента на курс
+ Присвоить оценку
+ Посмотреть список студентов и их курсов
+ Посмотреть курсы и кто на них записан
+📘 Пример CLI меню:
+1. Добавить студента
+2. Добавить курс
+3. Записать на курс
+4. Поставить оценку
+5. Показать студентов и курсы
+6. Показать курсы и студентов
+7. Выход
+'''
+
+
+
 import sqlite3
 from abc import ABC, abstractmethod
 
@@ -259,3 +300,205 @@ class UniversityApp:
                 teacher TEXT NOT NULL
             )
         """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS enrollments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                course_id INTEGER NOT NULL,
+                grade INTEGER,
+                FOREIGN KEY (student_id) REFERENCES students(id),
+                FOREIGN KEY (course_id) REFERENCES courses(id),
+                UNIQUE(student_id, course_id)
+            )
+        """)
+        
+        connection.commit()
+        connection.close()
+    
+    @staticmethod
+    def run():
+        DatabaseModel.connect()
+        
+        while True:
+            print("\nМеню:")
+            print("1. Добавить студента")
+            print("2. Добавить курс")
+            print("3. Записать на курс")
+            print("4. Поставить оценку")
+            print("5. Показать студентов и курсы")
+            print("6. Показать курсы и студентов")
+            print("7. Выход")
+            
+            choice = input("Выберите пункт меню: ")
+            
+            if choice == "1":
+                UniversityApp.add_student()
+            elif choice == "2":
+                UniversityApp.add_course()
+            elif choice == "3":
+                UniversityApp.enroll_student()
+            elif choice == "4":
+                UniversityApp.set_grade()
+            elif choice == "5":
+                UniversityApp.show_students_and_courses()
+            elif choice == "6":
+                UniversityApp.show_courses_and_students()
+            elif choice == "7":
+                print("Выход из программы.")
+                break
+            else:
+                print("Неверный выбор. Попробуйте снова.")
+        
+        DatabaseModel.close()
+    
+    @staticmethod
+    def add_student():
+        print("\nДобавление нового студента")
+        full_name = input("Введите ФИО студента: ")
+        age = int(input("Введите возраст студента: "))
+        
+        student = Student(full_name, age)
+        student.save_to_db()
+        print(f"Студент {full_name} успешно добавлен с ID {student.id}")
+    
+    @staticmethod
+    def add_course():
+        print("\nДобавление нового курса")
+        title = input("Введите название курса: ")
+        teacher = input("Введите имя преподавателя: ")
+        
+        course = Course(title, teacher)
+        course.save_to_db()
+        print(f"Курс {title} успешно добавлен с ID {course.id}")
+    
+    @staticmethod
+    def enroll_student():
+        print("\nЗапись студента на курс")
+        
+        students = Student.get_all()
+        if not students:
+            print("Нет доступных студентов. Сначала добавьте студентов.")
+            return
+        
+        print("\nСписок студентов:")
+        for student in students:
+            print(student.info())
+        
+        student_id = int(input("Введите ID студента: "))
+        student = Student.get_by_id(student_id)
+        if not student:
+            print("Студент с таким ID не найден.")
+            return
+        
+        courses = Course.get_all()
+        if not courses:
+            print("Нет доступных курсов. Сначала добавьте курсы.")
+            return
+        
+        print("\nСписок курсов:")
+        for course in courses:
+            print(course.info())
+        
+        course_id = int(input("Введите ID курса: "))
+        course = Course.get_by_id(course_id)
+        if not course:
+            print("Курс с таким ID не найден.")
+            return
+        
+        existing_enrollment = Enrollment.get_by_student_and_course(student_id, course_id)
+        if existing_enrollment:
+            print("Этот студент уже записан на данный курс.")
+            return
+        
+        enrollment = student.enroll(course)
+        print(f"Студент {student.full_name} успешно записан на курс {course.title}")
+    
+    @staticmethod
+    def set_grade():
+        print("\nУстановка оценки студенту за курс")
+        
+        students = Student.get_all()
+        if not students:
+            print("Нет доступных студентов.")
+            return
+        
+        print("\nСписок студентов:")
+        for student in students:
+            print(student.info())
+        
+        student_id = int(input("Введите ID студента: "))
+        student = Student.get_by_id(student_id)
+        if not student:
+            print("Студент с таким ID не найден.")
+            return
+        
+        courses = student.get_courses()
+        if not courses:
+            print("У этого студента нет записей на курсы.")
+            return
+        
+        print("\nКурсы, на которые записан студент:")
+        for i, course in enumerate(courses, 1):
+            print(f"{i}. {course[1]} (Преподаватель: {course[2]}, Оценка: {course[3] if course[3] else 'нет'})")
+        
+        course_index = int(input("Введите номер курса для установки оценки: ")) - 1
+        if course_index < 0 or course_index >= len(courses):
+            print("Неверный выбор курса.")
+            return
+        
+        course_id = courses[course_index][0]
+        grade = int(input("Введите оценку (1-5): "))
+        if grade < 1 or grade > 5:
+            print("Оценка должна быть от 1 до 5.")
+            return
+        
+        enrollment = Enrollment.get_by_student_and_course(student_id, course_id)
+        if enrollment:
+            enrollment.grade = grade
+            enrollment.save_to_db()
+            print(f"Оценка {grade} успешно установлена для студента {student.full_name} за курс {courses[course_index][1]}")
+        else:
+            print("Ошибка: запись на курс не найдена.")
+    
+    @staticmethod
+    def show_students_and_courses():
+        print("\nСписок студентов и их курсов:")
+        
+        students = Student.get_all()
+        if not students:
+            print("Нет доступных студентов.")
+            return
+        
+        for student in students:
+            print(f"\n{student.info()}")
+            courses = student.get_courses()
+            if courses:
+                print("Записан на курсы:")
+                for course in courses:
+                    print(f"- {course[1]} (Преподаватель: {course[2]}, Оценка: {course[3] if course[3] else 'нет'})")
+            else:
+                print("Не записан ни на один курс.")
+    
+    @staticmethod
+    def show_courses_and_students():
+        print("\nСписок курсов и их студентов:")
+        
+        courses = Course.get_all()
+        if not courses:
+            print("Нет доступных курсов.")
+            return
+        
+        for course in courses:
+            print(f"\n{course.info()}")
+            students = course.get_students()
+            if students:
+                print("Студенты на курсе:")
+                for student in students:
+                    print(f"- {student[1]} (Возраст: {student[2]}, Оценка: {student[3] if student[3] else 'нет'})")
+            else:
+                print("На курс пока никто не записан.")
+
+if name == "main":
+    UniversityApp.initialize_database()
+    UniversityApp.run()
